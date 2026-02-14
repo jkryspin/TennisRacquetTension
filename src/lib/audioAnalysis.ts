@@ -91,10 +91,11 @@ export function detectFundamentalFrequency(
   samples: Float32Array | number[],
   sampleRate: number
 ): number | null {
-  // Use the next power-of-2 that fits the input, capped at 16384.
-  // Smaller windows concentrate signal energy better on mobile devices.
-  let fftSize = 16384;
-  while (fftSize > samples.length && fftSize > 1024) fftSize >>= 1;
+  // Always use 32768-point FFT for fine frequency resolution (~1.46 Hz/bin
+  // at 48kHz). If the input is shorter (e.g. 16384 from the signal scanner),
+  // the Hann-windowed samples are zero-padded to 32768, which preserves the
+  // spectral resolution needed for accurate parabolic interpolation.
+  const fftSize = 32768;
   const windowSize = Math.min(samples.length, fftSize);
 
   // Take samples from the end of the buffer (most recent audio)
