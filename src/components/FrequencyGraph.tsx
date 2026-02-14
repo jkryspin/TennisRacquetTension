@@ -114,12 +114,21 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
       const maxBin = Math.min(Math.ceil(MAX_HZ / binWidth), freqData.length - 1);
       const binRange = maxBin - minBin;
 
+      // Find peak value in visible range for auto-scaling
+      let peakVal = 1;
+      for (let i = 0; i <= binRange; i++) {
+        const bin = minBin + i;
+        if (freqData[bin] > peakVal) peakVal = freqData[bin];
+      }
+      // Scale so peak reaches ~85% of graph height
+      const scale = (255 / peakVal) * 0.85;
+
       // Build path from frequency data
       ctx.beginPath();
       let firstY = 0;
       for (let i = 0; i <= binRange; i++) {
         const bin = minBin + i;
-        const val = freqData[bin] / 255; // 0-1
+        const val = Math.min(1, (freqData[bin] / 255) * scale); // auto-scaled 0-1
         const x = pad.left + (i / binRange) * gW;
         const y = pad.top + gH - val * gH;
         if (i === 0) {
@@ -147,7 +156,7 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
       ctx.beginPath();
       for (let i = 0; i <= binRange; i++) {
         const bin = minBin + i;
-        const val = freqData[bin] / 255;
+        const val = Math.min(1, (freqData[bin] / 255) * scale);
         const x = pad.left + (i / binRange) * gW;
         const y = pad.top + gH - val * gH;
         if (i === 0) ctx.moveTo(x, y);
