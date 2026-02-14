@@ -109,7 +109,7 @@ export function SetupForm({ settings, onChange, onStart }: SetupFormProps) {
       <button className="btn-primary" onClick={onStart}>
         Start Measuring
       </button>
-      <span className="version">v1.0.0 · {__BUILD_DATE__}</span>
+      <span className="version">v1.0.0 · {new Date(__BUILD_DATE__).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
     </div>
   );
 }
