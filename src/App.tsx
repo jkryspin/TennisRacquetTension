@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SetupForm, TensionSettings } from './components/SetupForm';
 import { FrequencyGraph } from './components/FrequencyGraph';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import {
   normalizeGaugeMm,
@@ -120,7 +121,8 @@ function tensionLbsToHz(tensionLbs: number, linearDensity: number, stringLength:
   return Math.sqrt(tensionN / linearDensity) / (2 * stringLength);
 }
 
-function getStatusMessage(hasFreq: boolean, lockCount: number): string {
+function getStatusMessage(status: string, hasFreq: boolean, lockCount: number): string {
+  if (status === 'requesting') return 'Requesting microphone access...';
   if (lockCount >= 5) return 'Frequency locked!';
   if (lockCount > 0) return `Locking in... ${lockCount}/5 readings`;
   if (hasFreq) return 'Frequency detected — keep plucking';
@@ -131,6 +133,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('setup');
   const [settings, setSettings] = useState<TensionSettings>(loadSettings);
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [confirm, setConfirm] = useState<{ message: string; label: string; onConfirm: () => void } | null>(null);
   const { state, start, stop, reset, getAnalyser } = useAudioAnalyzer();
 
   // Persist settings
@@ -191,11 +194,25 @@ export default function App() {
   }, [state.frequency, settings, stop]);
 
   const handleDeleteEntry = useCallback((id: string) => {
-    setHistory(h => h.filter(e => e.id !== id));
+    setConfirm({
+      message: 'Delete this measurement?',
+      label: 'Delete',
+      onConfirm: () => {
+        setHistory(h => h.filter(e => e.id !== id));
+        setConfirm(null);
+      },
+    });
   }, []);
 
   const handleClearHistory = useCallback(() => {
-    setHistory([]);
+    setConfirm({
+      message: 'Clear all history? This cannot be undone.',
+      label: 'Clear All',
+      onConfirm: () => {
+        setHistory([]);
+        setConfirm(null);
+      },
+    });
   }, []);
 
   const handleShare = useCallback(async () => {
@@ -304,12 +321,21 @@ export default function App() {
             })}
           </div>
         )}
+        {confirm && (
+          <ConfirmDialog
+            message={confirm.message}
+            confirmLabel={confirm.label}
+            onConfirm={confirm.onConfirm}
+            onCancel={() => setConfirm(null)}
+          />
+        )}
       </div>
     );
   }
 
   const isLive = screen === 'live' || screen === 'result';
   const statusMsg = getStatusMessage(
+    state.status,
     state.frequency != null,
     state.lockReadings.length
   );
@@ -319,7 +345,7 @@ export default function App() {
       <div className="live-screen">
         {/* Status indicator */}
         <div className="status-row">
-          <div className={`pulse-dot ${state.status === 'locked' ? 'locked' : 'listening'}`} />
+          <div className={`pulse-dot ${state.status === 'locked' ? 'locked' : state.status === 'requesting' ? 'requesting' : 'listening'}`} />
           <span className="status-text">{statusMsg}</span>
           <button className="btn-text" onClick={handleStop}>Cancel</button>
         </div>

@@ -39,9 +39,19 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
     let freqData: Uint8Array<ArrayBuffer> | null = null;
     let timeDomainData: Float32Array<ArrayBuffer> | null = null;
 
+    // Read theme-aware colors from CSS custom properties
+    const cs = getComputedStyle(document.documentElement);
+    const cssVar = (name: string) => cs.getPropertyValue(name).trim();
+
     const lineColor = locked ? '#22c55e' : '#3b82f6';
-    const glowColor = locked ? 'rgba(34, 197, 94, 0.15)' : 'rgba(59, 130, 246, 0.12)';
+    const glowColor = locked ? cssVar('--graph-glow-green') : cssVar('--graph-glow-blue');
     const peakColor = locked ? '#22c55e' : '#f59e0b';
+    const gridColor = cssVar('--graph-grid');
+    const labelColor = cssVar('--graph-label');
+    const rangeFill = cssVar('--graph-range-fill');
+    const rangeStroke = cssVar('--graph-range-stroke');
+    const flatLineColor = cssVar('--graph-flat');
+    const gradientEnd = cssVar('--graph-gradient-end');
 
     const draw = () => {
       const analyser = getAnalyser();
@@ -49,7 +59,7 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
       ctx.clearRect(0, 0, W, H);
 
       // Grid
-      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.strokeStyle = gridColor;
       ctx.lineWidth = 0.5;
       for (const frac of [0.25, 0.5, 0.75]) {
         const y = pad.top + gH * (1 - frac);
@@ -60,7 +70,7 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
       }
 
       // Frequency grid lines + labels
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillStyle = labelColor;
       ctx.font = '9px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       for (const hz of [200, 400, 600, 800]) {
@@ -80,9 +90,9 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
         if (clampHi > clampLo) {
           const x1 = pad.left + ((clampLo - MIN_HZ) / (MAX_HZ - MIN_HZ)) * gW;
           const x2 = pad.left + ((clampHi - MIN_HZ) / (MAX_HZ - MIN_HZ)) * gW;
-          ctx.fillStyle = 'rgba(34, 197, 94, 0.06)';
+          ctx.fillStyle = rangeFill;
           ctx.fillRect(x1, pad.top, x2 - x1, gH);
-          ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+          ctx.strokeStyle = rangeStroke;
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]);
           ctx.beginPath();
@@ -99,7 +109,7 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
 
       if (!analyser) {
         // Draw flat line when no analyser
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+        ctx.strokeStyle = flatLineColor;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(pad.left, pad.top + gH);
@@ -174,7 +184,7 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
 
       const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + gH);
       gradient.addColorStop(0, glowColor);
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, gradientEnd);
       ctx.fillStyle = gradient;
       ctx.fill();
 

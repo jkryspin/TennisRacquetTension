@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { detectFundamentalFrequency } from '../lib/audioAnalysis';
 
 export interface AnalyzerState {
-  status: 'idle' | 'listening' | 'locked';
+  status: 'idle' | 'requesting' | 'listening' | 'locked';
   frequency: number | null;
   lockReadings: number[];
   error: string | null;
@@ -150,6 +150,8 @@ export function useAudioAnalyzer() {
         }));
         return;
       }
+
+      setState(s => ({ ...s, status: 'requesting', error: null }));
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },

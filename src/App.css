@@ -16,8 +16,36 @@
   --amber: #f59e0b;
   --red: #ef4444;
   --radius: 12px;
+  --graph-grid: rgba(255,255,255,0.04);
+  --graph-label: rgba(255,255,255,0.2);
+  --graph-range-fill: rgba(34, 197, 94, 0.06);
+  --graph-range-stroke: rgba(34, 197, 94, 0.2);
+  --graph-glow-blue: rgba(59, 130, 246, 0.12);
+  --graph-glow-green: rgba(34, 197, 94, 0.15);
+  --graph-flat: rgba(59, 130, 246, 0.3);
+  --graph-gradient-end: rgba(0,0,0,0);
 
   color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --border: #d4d4d8;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --graph-grid: rgba(0,0,0,0.06);
+    --graph-label: rgba(0,0,0,0.3);
+    --graph-range-fill: rgba(34, 197, 94, 0.08);
+    --graph-range-stroke: rgba(34, 197, 94, 0.3);
+    --graph-glow-blue: rgba(59, 130, 246, 0.1);
+    --graph-glow-green: rgba(34, 197, 94, 0.12);
+    --graph-flat: rgba(59, 130, 246, 0.25);
+    --graph-gradient-end: rgba(255,255,255,0);
+
+    color-scheme: light;
+  }
 }
 
 html, body {
@@ -109,6 +137,12 @@ html, body {
 
 .select-field:focus {
   border-color: var(--blue);
+}
+
+@media (prefers-color-scheme: light) {
+  .select-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  }
 }
 
 .select-field option {
@@ -221,6 +255,11 @@ html, body {
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.pulse-dot.requesting {
+  background: var(--blue);
+  animation: pulse 1s ease-in-out infinite;
 }
 
 .pulse-dot.listening {
@@ -509,6 +548,63 @@ html, body {
   color: var(--red);
   font-size: 12px;
   padding: 4px 8px;
+}
+
+/* Confirm dialog */
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.confirm-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.confirm-message {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-actions .btn-secondary {
+  flex: 1;
+  padding: 12px;
+  min-height: 44px;
+}
+
+.btn-danger {
+  flex: 1;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px;
+  cursor: pointer;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-danger:active {
+  opacity: 0.8;
 }
 
 /* Version */
