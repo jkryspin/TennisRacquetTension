@@ -215,6 +215,7 @@ export function SetupForm({ settings, onChange, onStart }: SetupFormProps) {
       <button className="btn-primary" onClick={onStart}>
         Start Measuring
       </button>
+      <span className="version">v1.0.0</span>
     </div>
   );
 }

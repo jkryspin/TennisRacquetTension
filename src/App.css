@@ -505,3 +505,13 @@ html, body {
   font-size: 12px;
   padding: 4px 8px;
 }
+
+/* Version */
+.version {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  margin-top: 8px;
+}
