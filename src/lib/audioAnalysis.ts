@@ -91,7 +91,10 @@ export function detectFundamentalFrequency(
   samples: Float32Array | number[],
   sampleRate: number
 ): number | null {
-  const fftSize = 32768;
+  // Use the next power-of-2 that fits the input, capped at 16384.
+  // Smaller windows concentrate signal energy better on mobile devices.
+  let fftSize = 16384;
+  while (fftSize > samples.length && fftSize > 1024) fftSize >>= 1;
   const windowSize = Math.min(samples.length, fftSize);
 
   // Take samples from the end of the buffer (most recent audio)
