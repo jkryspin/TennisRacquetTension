@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SetupForm, TensionSettings } from './components/SetupForm';
 import { FrequencyGraph } from './components/FrequencyGraph';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
@@ -28,6 +28,23 @@ interface HistoryEntry {
 }
 
 type Screen = 'setup' | 'live' | 'result';
+
+function playLockSound() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 440;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+    osc.onended = () => ctx.close();
+  } catch { /* ignore */ }
+}
 
 const DEFAULT_SETTINGS: TensionSettings = {
   material: 'Polyester',
@@ -81,6 +98,28 @@ function computeTension(settings: TensionSettings, frequencyHz: number) {
   return calculateTension(frequencyHz, stringLength, linearDensity);
 }
 
+function getStringParams(settings: TensionSettings) {
+  const gaugeMm = normalizeGaugeMm(parseFloat(settings.gaugeMm) || 1.25);
+  let linearDensity: number;
+  if (settings.stringKey) {
+    const [brand, name] = settings.stringKey.split('|');
+    const dbDensity = lookupLinearDensity(brand, name, gaugeMm);
+    linearDensity = dbDensity ?? calculateLinearDensity(gaugeMm, MATERIAL_DENSITIES[settings.material] || 1380);
+  } else {
+    linearDensity = calculateLinearDensity(gaugeMm, MATERIAL_DENSITIES[settings.material] || 1380);
+  }
+  const { crosses } = parseStringPattern(settings.stringPattern);
+  linearDensity *= crossStringMassLoadingFactor(crosses);
+  const measuredMm = parseFloat(settings.stringLengthMm);
+  const stringLength = measuredMm > 0 ? measuredMm / 1000 : estimateStringLength(parseFloat(settings.headSizeSqIn) || 100);
+  return { linearDensity, stringLength };
+}
+
+function tensionLbsToHz(tensionLbs: number, linearDensity: number, stringLength: number): number {
+  const tensionN = tensionLbs * 4.44822;
+  return Math.sqrt(tensionN / linearDensity) / (2 * stringLength);
+}
+
 function getStatusMessage(hasFreq: boolean, lockCount: number): string {
   if (lockCount >= 5) return 'Frequency locked!';
   if (lockCount > 0) return `Locking in... ${lockCount}/5 readings`;
@@ -104,9 +143,10 @@ export default function App() {
     localStorage.setItem('tension-history', JSON.stringify(history));
   }, [history]);
 
-  // Auto-transition to result on lock
+  // Auto-transition to result on lock + play sound
   useEffect(() => {
     if (state.status === 'locked' && screen === 'live') {
+      playLockSound();
       setScreen('result');
     }
   }, [state.status, screen]);
@@ -158,7 +198,43 @@ export default function App() {
     setHistory([]);
   }, []);
 
+  const handleShare = useCallback(async () => {
+    if (!state.frequency) return;
+    const t = computeTension(settings, state.frequency);
+    const text = `My racquet string tension: ${t.tensionLbs.toFixed(1)} lbs (${t.tensionNewtons.toFixed(1)} N) at ${state.frequency.toFixed(1)} Hz — measured with String Tension Analyzer`;
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+  }, [state.frequency, settings]);
+
+  const handleExportCSV = useCallback(() => {
+    if (history.length === 0) return;
+    const header = 'Date,Tension (lbs),Tension (N),Frequency (Hz),String,Gauge (mm),Material,Head Size (sq in),Pattern\n';
+    const rows = history.map(e => {
+      const date = new Date(e.timestamp).toISOString();
+      const stringName = e.stringKey ? e.stringKey.replace('|', ' ') : '';
+      return `${date},${e.tensionLbs},${e.tensionNewtons},${e.frequencyHz},"${stringName}",${e.gaugeMm},${e.material},${e.headSizeSqIn},${e.stringPattern}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'string-tension-history.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [history]);
+
   const tension = state.frequency ? computeTension(settings, state.frequency) : null;
+
+  const validRangeHz = useMemo<[number, number]>(() => {
+    const { linearDensity, stringLength } = getStringParams(settings);
+    return [
+      tensionLbsToHz(20, linearDensity, stringLength),
+      tensionLbsToHz(65, linearDensity, stringLength),
+    ];
+  }, [settings]);
 
   // Setup screen
   if (screen === 'setup') {
@@ -191,7 +267,10 @@ export default function App() {
           <div className="history">
             <div className="history-header">
               <h3>History</h3>
-              <button className="btn-text" onClick={handleClearHistory}>Clear</button>
+              <div className="history-actions">
+                <button className="btn-text" onClick={handleExportCSV}>Export</button>
+                <button className="btn-text" onClick={handleClearHistory}>Clear</button>
+              </div>
             </div>
             {history.map(entry => {
               const [brand, model] = entry.stringKey
@@ -279,6 +358,7 @@ export default function App() {
           getAnalyser={getAnalyser}
           highlightFrequency={state.frequency}
           locked={state.status === 'locked'}
+          validRangeHz={validRangeHz}
           active={isLive && state.status !== 'locked'}
         />
 
@@ -291,6 +371,7 @@ export default function App() {
         {screen === 'result' && (
           <div className="result-actions">
             <button className="btn-primary" onClick={handleSave}>Save Result</button>
+            <button className="btn-secondary" onClick={handleShare}>Share</button>
             <button className="btn-secondary" onClick={handleTryAgain}>Try Again</button>
             <button className="btn-text" onClick={handleStop}>Done</button>
           </div>

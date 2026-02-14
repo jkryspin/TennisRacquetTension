@@ -85,6 +85,7 @@ export function useAudioAnalyzer() {
 
           if (isConsistent) {
             readings.push(freq);
+            navigator.vibrate?.(30);
           } else {
             readings.length = 0;
             readings.push(freq);
@@ -93,6 +94,7 @@ export function useAudioAnalyzer() {
           if (readings.length >= LOCK_COUNT) {
             const avgFreq = readings.reduce((a, b) => a + b, 0) / readings.length;
             lockedRef.current = true;
+            navigator.vibrate?.([50, 50, 100]);
             setState({
               status: 'locked',
               frequency: Math.round(avgFreq * 10) / 10,

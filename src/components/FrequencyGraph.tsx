@@ -5,13 +5,14 @@ interface FrequencyGraphProps {
   highlightFrequency: number | null;
   locked: boolean;
   active: boolean; // whether to run the animation loop
+  validRangeHz?: [number, number]; // [minHz, maxHz] for valid tension range
 }
 
 // Map from bin index to Hz for display range 100-1000 Hz
 const MIN_HZ = 100;
 const MAX_HZ = 1000;
 
-export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active }: FrequencyGraphProps) {
+export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active, validRangeHz }: FrequencyGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef(0);
 
@@ -69,6 +70,31 @@ export function FrequencyGraph({ getAnalyser, highlightFrequency, locked, active
         ctx.lineTo(x, pad.top + gH);
         ctx.stroke();
         ctx.fillText(`${hz}`, x, H - 4);
+      }
+
+      // Valid tension range band
+      if (validRangeHz) {
+        const [loHz, hiHz] = validRangeHz;
+        const clampLo = Math.max(loHz, MIN_HZ);
+        const clampHi = Math.min(hiHz, MAX_HZ);
+        if (clampHi > clampLo) {
+          const x1 = pad.left + ((clampLo - MIN_HZ) / (MAX_HZ - MIN_HZ)) * gW;
+          const x2 = pad.left + ((clampHi - MIN_HZ) / (MAX_HZ - MIN_HZ)) * gW;
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.06)';
+          ctx.fillRect(x1, pad.top, x2 - x1, gH);
+          ctx.strokeStyle = 'rgba(34, 197, 94, 0.2)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x1, pad.top);
+          ctx.lineTo(x1, pad.top + gH);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x2, pad.top);
+          ctx.lineTo(x2, pad.top + gH);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
 
       if (!analyser) {
