@@ -12,7 +12,6 @@ import {
   crossStringMassLoadingFactor,
   MATERIAL_DENSITIES,
 } from './lib/audioAnalysis';
-import { lookupLinearDensity } from './lib/stringDatabase';
 
 interface HistoryEntry {
   id: string;
@@ -20,7 +19,6 @@ interface HistoryEntry {
   frequencyHz: number;
   tensionLbs: number;
   tensionNewtons: number;
-  stringKey: string;
   gaugeMm: string;
   material: string;
   headSizeSqIn: string;
@@ -52,7 +50,6 @@ const DEFAULT_SETTINGS: TensionSettings = {
   gaugeMm: '1.25',
   headSizeSqIn: '100',
   stringPattern: '16x19',
-  stringKey: '',
   stringLengthMm: '',
 };
 
@@ -74,17 +71,8 @@ function loadHistory(): HistoryEntry[] {
 
 function computeTension(settings: TensionSettings, frequencyHz: number) {
   const gaugeMm = normalizeGaugeMm(parseFloat(settings.gaugeMm) || 1.25);
-
-  // Linear density: use measured DB value if available, else cylinder model
-  let linearDensity: number;
-  if (settings.stringKey) {
-    const [brand, name] = settings.stringKey.split('|');
-    const dbDensity = lookupLinearDensity(brand, name, gaugeMm);
-    linearDensity = dbDensity ?? calculateLinearDensity(gaugeMm, MATERIAL_DENSITIES[settings.material] || 1380);
-  } else {
-    const density = MATERIAL_DENSITIES[settings.material] || 1380;
-    linearDensity = calculateLinearDensity(gaugeMm, density);
-  }
+  const materialDensity = MATERIAL_DENSITIES[settings.material] || 1380;
+  let linearDensity = calculateLinearDensity(gaugeMm, materialDensity);
 
   // Apply cross-string mass loading correction
   const { crosses } = parseStringPattern(settings.stringPattern);
@@ -101,14 +89,8 @@ function computeTension(settings: TensionSettings, frequencyHz: number) {
 
 function getStringParams(settings: TensionSettings) {
   const gaugeMm = normalizeGaugeMm(parseFloat(settings.gaugeMm) || 1.25);
-  let linearDensity: number;
-  if (settings.stringKey) {
-    const [brand, name] = settings.stringKey.split('|');
-    const dbDensity = lookupLinearDensity(brand, name, gaugeMm);
-    linearDensity = dbDensity ?? calculateLinearDensity(gaugeMm, MATERIAL_DENSITIES[settings.material] || 1380);
-  } else {
-    linearDensity = calculateLinearDensity(gaugeMm, MATERIAL_DENSITIES[settings.material] || 1380);
-  }
+  const materialDensity = MATERIAL_DENSITIES[settings.material] || 1380;
+  let linearDensity = calculateLinearDensity(gaugeMm, materialDensity);
   const { crosses } = parseStringPattern(settings.stringPattern);
   linearDensity *= crossStringMassLoadingFactor(crosses);
   const measuredMm = parseFloat(settings.stringLengthMm);
@@ -181,7 +163,6 @@ export default function App() {
       frequencyHz: state.frequency,
       tensionLbs,
       tensionNewtons,
-      stringKey: settings.stringKey,
       gaugeMm: settings.gaugeMm,
       material: settings.material,
       headSizeSqIn: settings.headSizeSqIn,
@@ -228,11 +209,10 @@ export default function App() {
 
   const handleExportCSV = useCallback(() => {
     if (history.length === 0) return;
-    const header = 'Date,Tension (lbs),Tension (N),Frequency (Hz),String,Gauge (mm),Material,Head Size (sq in),Pattern\n';
+    const header = 'Date,Tension (lbs),Tension (N),Frequency (Hz),Material,Gauge (mm),Head Size (sq in),Pattern\n';
     const rows = history.map(e => {
       const date = new Date(e.timestamp).toISOString();
-      const stringName = e.stringKey ? e.stringKey.replace('|', ' ') : '';
-      return `${date},${e.tensionLbs},${e.tensionNewtons},${e.frequencyHz},"${stringName}",${e.gaugeMm},${e.material},${e.headSizeSqIn},${e.stringPattern}`;
+      return `${date},${e.tensionLbs},${e.tensionNewtons},${e.frequencyHz},${e.material},${e.gaugeMm},${e.headSizeSqIn},${e.stringPattern}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -275,8 +255,7 @@ export default function App() {
             <p>A tighter string vibrates at a higher pitch when plucked. This app listens to that pitch and works backwards to calculate the tension.</p>
             <p>Your mic picks up the sound, the app finds the vibration frequency, then uses a physics formula with your string's weight and length to get tension:</p>
             <p className="formula">T = μ × (2Lf)²</p>
-            <p><strong>Selecting your string from the database</strong> uses real measured weights instead of estimating, which is much more accurate — especially for shaped strings like Hyper-G.</p>
-            <p><strong>Measuring the string length</strong> with a tape measure (grommet to grommet, center main) removes another source of guesswork.</p>
+            <p><strong>Measuring the string length</strong> with a tape measure (grommet to grommet, center main) removes a source of guesswork.</p>
             <p>The app waits for 5 consistent readings before locking in, and ignores anything outside 20–65 lbs to filter out noise.</p>
           </div>
         </details>
@@ -290,12 +269,7 @@ export default function App() {
               </div>
             </div>
             {history.map(entry => {
-              const [brand, model] = entry.stringKey
-                ? entry.stringKey.split('|')
-                : ['', ''];
-              const stringLabel = brand
-                ? `${brand} ${model}`
-                : `${entry.material} ${entry.gaugeMm}mm`;
+              const stringLabel = `${entry.material} ${entry.gaugeMm}mm`;
               return (
                 <div key={entry.id} className="history-entry">
                   <div className="history-main">
