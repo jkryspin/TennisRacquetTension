@@ -56,35 +56,17 @@ export function useAudioAnalyzer() {
 
         analyser.getFloatTimeDomainData(timeDomainBuf);
 
-        // Find the region with the strongest signal — on iOS the buffer may
-        // contain stale/quiet data at the start. Scan in chunks to find the
-        // loudest region, then run RMS and FFT on that portion.
-        const analysisSize = 16384;
+        let sumSq = 0;
         const len = timeDomainBuf.length;
-        let bestOffset = Math.max(0, len - analysisSize);
-        let bestRms = 0;
-
-        // Check a few candidate windows (end, mid, start)
-        for (let off = Math.max(0, len - analysisSize); off >= 0; off -= 4096) {
-          let sumSq = 0;
-          const checkLen = Math.min(4096, len - off);
-          for (let i = off; i < off + checkLen; i++) {
-            sumSq += timeDomainBuf[i] * timeDomainBuf[i];
-          }
-          const rms = Math.sqrt(sumSq / checkLen);
-          if (rms > bestRms) {
-            bestRms = rms;
-            bestOffset = off;
-          }
+        const start = Math.max(0, len - 4096);
+        for (let i = start; i < len; i++) {
+          sumSq += timeDomainBuf[i] * timeDomainBuf[i];
         }
-
-        // Extract the best window for analysis
-        const windowStart = Math.max(0, Math.min(bestOffset, len - analysisSize));
-        const analysisBuf = timeDomainBuf.subarray(windowStart, windowStart + analysisSize);
+        const rms = Math.sqrt(sumSq / (len - start));
 
         let freq: number | null = null;
-        if (bestRms >= MIN_SIGNAL_RMS) {
-          freq = detectFundamentalFrequency(analysisBuf, ctx.sampleRate);
+        if (rms >= MIN_SIGNAL_RMS) {
+          freq = detectFundamentalFrequency(timeDomainBuf, ctx.sampleRate);
         }
 
         if (freq) {
